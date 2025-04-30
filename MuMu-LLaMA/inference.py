@@ -50,7 +50,7 @@ parser.add_argument(
     help='Decoder to use musicgen/audioldm2')
 
 parser.add_argument(
-    '--music_decoder_path', default="facebook/musicgen-medium", type=str,
+    '--music_decoder_path', default="facebook/musicgen-small", type=str,
     help='Path to decoder to use musicgen/audioldm2')
 
 # Input Arguments
