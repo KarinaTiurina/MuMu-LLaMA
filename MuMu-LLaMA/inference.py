@@ -26,19 +26,19 @@ parser.add_argument(
     help="Type of llama original weight",
 )
 parser.add_argument(
-    "--llama_dir", default="/path/to/llama", type=str,
+    "--llama_dir", default="./ckpts/LLaMA", type=str,
     help="Path to LLaMA pretrained checkpoint",
 )
 parser.add_argument(
-    "--mert_path", default="m-a-p/MERT-v1-330M", type=str,
+    "--mert_path", default="./ckpts/m-a-p/MERT-v1-330M", type=str,
     help="Path to MERT pretrained checkpoint",
 )
 parser.add_argument(
-    "--vit_path", default="google/vit-base-patch16-224-in21k", type=str,
+    "--vit_path", default="./ckpts/google/vit-base-patch16-224-in21k", type=str,
     help="Path to ViT pretrained checkpoint",
 )
 parser.add_argument(
-    "--vivit_path", default="google/vivit-b-16x2-kinetics400", type=str,
+    "--vivit_path", default="./ckpts/google/vivit-b-16x2-kinetics400", type=str,
     help="Path to ViViT pretrained checkpoint",
 )
 parser.add_argument(
