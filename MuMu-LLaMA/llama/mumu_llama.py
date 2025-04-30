@@ -239,7 +239,9 @@ class MuMu_LLaMA(nn.Module):
         # 4. prefix
         self.query_layer = 6
         self.query_len = 1
-        self.prefix_query = nn.Embedding(self.query_layer * 3 * self.query_len, self.model_args.dim)
+        # self.prefix_query = nn.Embedding(self.query_layer * 3 * self.query_len, self.model_args.dim)
+        # KDBG: Changing dimension to match MuMu-LlaMA with MusicGen Small checkpoint
+        self.prefix_query = nn.Embedding(20, self.model_args.dim)
 
         # 5. knn
         self.knn = knn
