@@ -88,7 +88,7 @@ for key, value in checkpoint['model'].items():
     key = key.replace("module.", "")
     new_ckpt[key] = value
 
-load_result = model.load_state_dict(new_ckpt, strict=True)
+load_result = model.load_state_dict(checkpoint['model'], strict=False)
 assert len(load_result.unexpected_keys) == 0, f"Unexpected keys: {load_result.unexpected_keys}"
 model.eval()
 model.to("cuda")
@@ -144,9 +144,10 @@ def parse_text(text, image_path, video_path, audio_path):
 
 def save_audio_to_local(audio, sec):
     global generated_audio_files
-    if not os.path.exists('temp'):
-        os.mkdir('temp')
-    filename = os.path.join('temp', next(tempfile._get_candidate_names()) + '.wav')
+    generated_dir='/home2/faculty/ktiurina/composer'
+    if not os.path.exists(generated_dir):
+        os.mkdir(generated_dir)
+    filename = os.path.join(generated_dir, next(tempfile._get_candidate_names()) + '.wav')
     if args.music_decoder == "audioldm2":
         scipy.io.wavfile.write(filename, rate=16000, data=audio[0])
     else:
