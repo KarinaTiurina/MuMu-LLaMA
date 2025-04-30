@@ -34,11 +34,11 @@ parser.add_argument(
     help="Path to MERT pretrained checkpoint",
 )
 parser.add_argument(
-    "--vit_path", default="m-a-p/MERT-v1-330M", type=str,
+    "--vit_path", default="google/vit-base-patch16-224-in21k", type=str,
     help="Path to ViT pretrained checkpoint",
 )
 parser.add_argument(
-    "--vivit_path", default="m-a-p/MERT-v1-330M", type=str,
+    "--vivit_path", default="google/vivit-b-16x2-kinetics400", type=str,
     help="Path to ViViT pretrained checkpoint",
 )
 parser.add_argument(
