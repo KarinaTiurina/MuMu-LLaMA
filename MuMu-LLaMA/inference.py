@@ -83,12 +83,17 @@ model = MuMu_LLaMA(llama_ckpt_dir, llama_tokenzier_path, args, knn=False, stage=
 print("Loading Model Checkpoint")
 checkpoint = torch.load(args.model, map_location='cpu')
 
-new_ckpt = {}
-for key, value in checkpoint['model'].items():
-    key = key.replace("module.", "")
-    new_ckpt[key] = value
+print("KDBG: keys in checkpoint:")
+for key in checkpoint.keys():
+    print(key)
+print("KDBG: end keys in checkpoint:")
 
-load_result = model.load_state_dict(new_ckpt, strict=True)
+# new_ckpt = {}
+# for key, value in checkpoint['model'].items():
+#     key = key.replace("module.", "")
+#     new_ckpt[key] = value
+
+load_result = model.load_state_dict(checkpoint['model'], strict=False)
 assert len(load_result.unexpected_keys) == 0, f"Unexpected keys: {load_result.unexpected_keys}"
 model.eval()
 model.to("cuda")
