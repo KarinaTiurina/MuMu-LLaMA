@@ -144,7 +144,7 @@ def parse_text(text, image_path, video_path, audio_path):
 
 def save_audio_to_local(audio, sec):
     global generated_audio_files
-    generated_dir='/home2/faculty/ktiurina/composer'
+    generated_dir='temp'
     if not os.path.exists(generated_dir):
         os.mkdir(generated_dir)
     filename = os.path.join(generated_dir, next(tempfile._get_candidate_names()) + '.wav')
