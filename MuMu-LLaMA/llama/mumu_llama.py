@@ -522,8 +522,11 @@ class MuMu_LLaMA(nn.Module):
             h = layer(h, 0, freqs_cis, mask)
             music_output_embedding.append(h)
 
+        # prefix_query = self.prefix_query.weight.reshape(
+        #     self.query_layer * 3, 1, 4096).unsqueeze(1)
+        # KDBG Updating to match the checkpoint
         prefix_query = self.prefix_query.weight.reshape(
-            self.query_layer * 3, 1, 4096).unsqueeze(1)
+            20, 1, 4096).unsqueeze(1)
 
         prefix_index = 0
         if audio_feats is not None:
