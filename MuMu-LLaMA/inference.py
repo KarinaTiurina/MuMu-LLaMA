@@ -16,86 +16,70 @@ import av
 import subprocess
 import librosa
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--model", default="./ckpts/checkpoint.pth", type=str,
-    help="Name of or path to MuMu_LLaMA pretrained checkpoint",
-)
-parser.add_argument(
-    "--llama_type", default="7B", type=str,
-    help="Type of llama original weight",
-)
-parser.add_argument(
-    "--llama_dir", default="./ckpts/LLaMA", type=str,
-    help="Path to LLaMA pretrained checkpoint",
-)
-parser.add_argument(
-    "--mert_path", default="./ckpts/m-a-p/MERT-v1-330M", type=str,
-    help="Path to MERT pretrained checkpoint",
-)
-parser.add_argument(
-    "--vit_path", default="./ckpts/google/vit-base-patch16-224-in21k", type=str,
-    help="Path to ViT pretrained checkpoint",
-)
-parser.add_argument(
-    "--vivit_path", default="./ckpts/google/vivit-b-16x2-kinetics400", type=str,
-    help="Path to ViViT pretrained checkpoint",
-)
-parser.add_argument(
-    "--knn_dir", default="./ckpts", type=str,
-    help="Path to directory with KNN Index",
-)
-parser.add_argument(
-    '--music_decoder', default="musicgen", type=str,
-    help='Decoder to use musicgen/audioldm2')
+from datasets import load_from_disk
+from tqdm import tqdm
 
-parser.add_argument(
-    '--music_decoder_path', default="facebook/musicgen-small", type=str,
-    help='Path to decoder to use musicgen/audioldm2')
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model", default="./ckpts/checkpoint.pth", type=str,
+        help="Name of or path to MuMu_LLaMA pretrained checkpoint",
+    )
+    parser.add_argument(
+        "--llama_type", default="7B", type=str,
+        help="Type of llama original weight",
+    )
+    parser.add_argument(
+        "--llama_dir", default="./ckpts/LLaMA", type=str,
+        help="Path to LLaMA pretrained checkpoint",
+    )
+    parser.add_argument(
+        "--mert_path", default="./ckpts/m-a-p/MERT-v1-330M", type=str,
+        help="Path to MERT pretrained checkpoint",
+    )
+    parser.add_argument(
+        "--vit_path", default="./ckpts/google/vit-base-patch16-224-in21k", type=str,
+        help="Path to ViT pretrained checkpoint",
+    )
+    parser.add_argument(
+        "--vivit_path", default="./ckpts/google/vivit-b-16x2-kinetics400", type=str,
+        help="Path to ViViT pretrained checkpoint",
+    )
+    parser.add_argument(
+        "--knn_dir", default="./ckpts", type=str,
+        help="Path to directory with KNN Index",
+    )
+    parser.add_argument(
+        '--music_decoder', default="musicgen", type=str,
+        help='Decoder to use musicgen/audioldm2')
 
-# Input Arguments
-parser.add_argument(
-    "--prompt", default="Generate a music", type=str,
-    help="Input Prompt to the MuMu_LLaMA model",
-)
-parser.add_argument(
-    "--audio_file", default=None, type=str,
-    help="Input Audio File to the MuMu_LLaMA model",
-)
-parser.add_argument(
-    "--image_file", default=None, type=str,
-    help="Input Image File to the MuMu_LLaMA model",
-)
-parser.add_argument(
-    "--video_file", default=None, type=str,
-    help="Input Video File to the MuMu_LLaMA model",
-)
+    parser.add_argument(
+        '--music_decoder_path', default="facebook/musicgen-small", type=str,
+        help='Path to decoder to use musicgen/audioldm2')
 
-args = parser.parse_args()
+    # Input Arguments
+    parser.add_argument(
+        "--prompt", default="Generate a music", type=str,
+        help="Input Prompt to the MuMu_LLaMA model",
+    )
+    parser.add_argument(
+        "--audio_file", default=None, type=str,
+        help="Input Audio File to the MuMu_LLaMA model",
+    )
+    parser.add_argument(
+        "--image_file", default=None, type=str,
+        help="Input Image File to the MuMu_LLaMA model",
+    )
+    parser.add_argument(
+        "--video_file", default=None, type=str,
+        help="Input Video File to the MuMu_LLaMA model",
+    )
+    parser.add_argument(
+        "--eval_set", default=None, type=str,
+        help="musiccaps|muimage|muvideo",
+    )
 
-generated_audio_files = []
-
-llama_type = args.llama_type
-llama_ckpt_dir = os.path.join(args.llama_dir, llama_type)
-llama_tokenzier_path = args.llama_dir
-model = MuMu_LLaMA(llama_ckpt_dir, llama_tokenzier_path, args, knn=False, stage=3, load_llama=False)
-
-print("Loading Model Checkpoint")
-checkpoint = torch.load(args.model, map_location='cpu')
-
-new_ckpt = {}
-for key, value in checkpoint['model'].items():
-    key = key.replace("module.", "")
-    new_ckpt[key] = value
-
-load_result = model.load_state_dict(checkpoint['model'], strict=False)
-assert len(load_result.unexpected_keys) == 0, f"Unexpected keys: {load_result.unexpected_keys}"
-model.eval()
-model.to("cuda")
-
-transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Lambda(lambda x: x.repeat(3, 1, 1) if x.size(0) == 1 else x)])
-
+    return parser.parse_args()
 
 def parse_text(text, image_path, video_path, audio_path):
     """copy from https://github.com/GaiZhenbiao/ChuanhuChatGPT/"""
@@ -142,12 +126,13 @@ def parse_text(text, image_path, video_path, audio_path):
     return text, outputs
 
 
-def save_audio_to_local(audio, sec):
+def save_audio_to_local(audio, sec, output_folder=None, output_filename=None):
     global generated_audio_files
-    generated_dir='temp'
+    generated_dir=output_folder
     if not os.path.exists(generated_dir):
         os.mkdir(generated_dir)
-    filename = os.path.join(generated_dir, next(tempfile._get_candidate_names()) + '.wav')
+    # filename = os.path.join(generated_dir, next(tempfile._get_candidate_names()) + '.wav')
+    filename = os.path.join(generated_dir, output_filename)
     if args.music_decoder == "audioldm2":
         scipy.io.wavfile.write(filename, rate=16000, data=audio[0])
     else:
@@ -156,7 +141,7 @@ def save_audio_to_local(audio, sec):
     return filename
 
 
-def parse_reponse(model_outputs, audio_length_in_s):
+def parse_reponse(model_outputs, audio_length_in_s, output_folder=None, output_filename=None):
     response = ''
     text_outputs = []
     filename = None
@@ -173,7 +158,7 @@ def parse_reponse(model_outputs, audio_length_in_s):
                     response += '<br>'
                     _temp_output += m.replace(''.join([f'[AUD{i}]' for i in range(8)]), '')
                 else:
-                    filename = save_audio_to_local(m, audio_length_in_s)
+                    filename = save_audio_to_local(m, audio_length_in_s, output_folder, output_filename)
                     _temp_output = f'<Audio>{filename}</Audio> ' + _temp_output
                     response += f'<audio controls playsinline><source src="./file={filename}" type="audio/wav"></audio>'
             text_outputs.append(_temp_output)
@@ -227,7 +212,9 @@ def predict(
         video_path,
         top_p,
         temperature,
-        audio_length_in_s):
+        audio_length_in_s, 
+        output_folder=None,
+        output_filename=None):
     prompts = [llama.format_prompt(prompt_input)]
     prompts = [model.tokenizer(x).input_ids for x in prompts]
     image, audio, video = None, None, None
@@ -254,11 +241,52 @@ def predict(
 
     response = model.generate(prompts, audio, image, video, 512, temperature, top_p,
                               audio_length_in_s=audio_length_in_s)
-    response_chat, response_outputs, filename = parse_reponse(response, audio_length_in_s)
+    response_chat, response_outputs, filename = parse_reponse(response, audio_length_in_s, output_folder, output_filename)
     print(f"Q. {prompt_input}")
     print(f"A. {response[0]}")
     if filename is not None:
         print(f"Generated Audio: {filename}")
 
+if __name__ == "__main__":
+    global args
+    args = parse_args()
 
-predict(args.prompt, args.image_file, args.audio_file, args.video_file, 0.8, 0.6, 30)
+    generated_audio_files = []
+
+    llama_type = args.llama_type
+    llama_ckpt_dir = os.path.join(args.llama_dir, llama_type)
+    llama_tokenzier_path = args.llama_dir
+    model = MuMu_LLaMA(llama_ckpt_dir, llama_tokenzier_path, args, knn=False, stage=3, load_llama=False)
+
+    print("Loading Model Checkpoint")
+    checkpoint = torch.load(args.model, map_location='cpu')
+
+    new_ckpt = {}
+    for key, value in checkpoint['model'].items():
+        key = key.replace("module.", "")
+        new_ckpt[key] = value
+
+    load_result = model.load_state_dict(checkpoint['model'], strict=False)
+    assert len(load_result.unexpected_keys) == 0, f"Unexpected keys: {load_result.unexpected_keys}"
+    model.eval()
+    model.to("cuda")
+
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Lambda(lambda x: x.repeat(3, 1, 1) if x.size(0) == 1 else x)])
+
+    if (args.eval_set is None):
+        predict(args.prompt, args.image_file, args.audio_file, args.video_file, 0.8, 0.6, 30)
+    elif args.eval_set == 'musiccaps':
+        print("Start generating for MusicCaps dataset")
+        musiccaps = load_from_disk('path\to\MusicCaps\metadata')
+        output_folder = 'path\to\generated\MusicCaps\musicgen-small'
+        os.makedirs(output_folder, exist_ok=True)
+        for i, sample in enumerate(tqdm(musiccaps, desc="Generating music", total=len(musiccaps), disable=True)):
+            file_id = sample['ytid']
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+                print(f"Sample {file_id} already generated. Skip")
+            else:
+                caption = sample['caption']
+                predict(caption, None, None, None, 0.8, 0.6, 30, output_folder, output_filename)
