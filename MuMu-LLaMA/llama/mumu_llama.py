@@ -361,7 +361,7 @@ class MuMu_LLaMA(nn.Module):
             inputs = self.vivit_processor(list(sub_x), padding=True, return_tensors="pt").to(self.vivit_model.device)
             with torch.no_grad():
                 outputs = self.vivit_model(**inputs, output_hidden_states=True)
-            hidden_states = outputs.output_hidden_states
+            hidden_states = outputs.last_hidden_state
             sub_x = self.iu_vivit_agg(hidden_states.to(self.device)).squeeze()
             xs.append(sub_x)
         return torch.stack(xs, dim=0)
@@ -468,12 +468,12 @@ class MuMu_LLaMA(nn.Module):
         video_feats = sum([output * output_weight for output, output_weight in zip(outputs, outputs_weights)])
         device = video_feats.device
 
-        video_feats, _ = self.iu_vivit_rnn(video_feats)
+        # video_feats, _ = self.iu_vivit_rnn(video_feats)
 
-        attention_weights = self.iu_vivit_attention(video_feats).squeeze(-1)
-        attention_scores = self.iu_vivit_softmax(attention_weights)
+        # attention_weights = self.iu_vivit_attention(video_feats).squeeze(-1)
+        # attention_scores = self.iu_vivit_softmax(attention_weights)
         
-        video_feats = torch.matmul(attention_scores.unsqueeze(1), video_feats).squeeze(1)
+        # video_feats = torch.matmul(attention_scores.unsqueeze(1), video_feats).squeeze(1)
 
         if self.knn:
             video_feats_ori = video_feats

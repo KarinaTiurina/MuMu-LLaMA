@@ -19,6 +19,12 @@ import librosa
 from datasets import load_from_disk
 from tqdm import tqdm
 
+import pandas as pd
+
+import json
+
+import logging
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -76,7 +82,15 @@ def parse_args():
     )
     parser.add_argument(
         "--eval_set", default=None, type=str,
-        help="musiccaps|muimage|muvideo",
+        help="musiccaps|muimage|muvideo|imemnet",
+    )
+    parser.add_argument(
+        "--filename", default=None, type=str,
+        help="Output filename"
+    )
+    parser.add_argument(
+        "--output_folder", default=None, type=str,
+        help="Output folder"
     )
 
     return parser.parse_args()
@@ -248,14 +262,18 @@ def predict(
         print(f"Generated Audio: {filename}")
 
 if __name__ == "__main__":
+    print("MuMu-LLaMA inference.")
     global args
     args = parse_args()
+    print(f"Eval set is {args.eval_set}")
 
     generated_audio_files = []
 
+    print(f"Setting up model architecture")
     llama_type = args.llama_type
     llama_ckpt_dir = os.path.join(args.llama_dir, llama_type)
     llama_tokenzier_path = args.llama_dir
+    global model
     model = MuMu_LLaMA(llama_ckpt_dir, llama_tokenzier_path, args, knn=False, stage=3, load_llama=False)
 
     print("Loading Model Checkpoint")
@@ -271,22 +289,123 @@ if __name__ == "__main__":
     model.eval()
     model.to("cuda")
 
+    print("Setting up transforrms")
+
+    global transform
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Lambda(lambda x: x.repeat(3, 1, 1) if x.size(0) == 1 else x)])
 
     if (args.eval_set is None):
-        predict(args.prompt, args.image_file, args.audio_file, args.video_file, 0.8, 0.6, 30)
+        print(f"Generating single sample for prompt: {args.prompt}")
+        print(args.image_file)
+        print(args.audio_file)
+        print(args.video_file)
+        output_folder = '/home2/faculty/ktiurina/composer/data/survey'
+        output_filename = args.filename
+        if (output_filename is None):
+            output_filename = next(tempfile._get_candidate_names()) + '.wav'
+        predict(args.prompt, args.image_file, args.audio_file, args.video_file, 0.8, 0.6, 30, output_folder, output_filename)
     elif args.eval_set == 'musiccaps':
         print("Start generating for MusicCaps dataset")
-        musiccaps = load_from_disk('path\to\MusicCaps\metadata')
-        output_folder = 'path\to\generated\MusicCaps\musicgen-small'
+        musiccaps = load_from_disk('/home2/faculty/ktiurina/composer/data/MusicCaps/metadata')
+        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MusicCaps/MuMu-LLaMA'
         os.makedirs(output_folder, exist_ok=True)
-        for i, sample in enumerate(tqdm(musiccaps, desc="Generating music", total=len(musiccaps), disable=True)):
+        for sample in musiccaps:
             file_id = sample['ytid']
             output_filename = f'{file_id}.wav'
             outfile = os.path.join(output_folder, f'{file_id}.wav')
             if os.path.isfile(outfile):
                 print(f"Sample {file_id} already generated. Skip")
             else:
-                caption = sample['caption']
+                caption = f"Generate music for the following caption: {sample['caption']}"
                 predict(caption, None, None, None, 0.8, 0.6, 30, output_folder, output_filename)
+            print(f"Generated {output_filename}")
+    elif args.eval_set == 'muimage':
+        print("Start generating for MUImage dataset")
+        muimage_instructions = '/home2/faculty/ktiurina/composer/data/MUImage/MUImageInstructions.json'
+        images_folder = '/home2/faculty/ktiurina/composer/data/MUImage/muimage_images/hpctmp/e0589920/MUGen/data/MUImage/audioset_images'
+        with open(muimage_instructions, 'r') as file:
+            MuImage = json.load(file)
+
+        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MUImage/MuMu-LLaMA'
+        os.makedirs(output_folder, exist_ok=True)
+        for sample in MuImage:
+            file_id = sample['input_file'].split('.')[0]
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+                print(f"Sample {file_id} already generated. Skip")
+            else:
+                image_path = os.path.join(images_folder, sample['input_file'])
+                human_msg = [msg for msg in sample['conversation'] if msg.get('from') == 'human']
+                if len(human_msg) > 0:
+                    prompt = human_msg[0]['value']
+                else:
+                    prompt = 'Generate music for the image'
+                predict(prompt, image_path, None, None, 0.8, 0.6, 30, output_folder, output_filename)
+                print(f"Generated {output_filename}")
+    elif args.eval_set == 'custom':
+        print("Start generating for custom dataset")
+        output_folder = args.output_folder
+        os.makedirs(output_folder, exist_ok=True)
+        styles_df = pd.read_csv("/home2/faculty/ktiurina/composer/data/custom/MusicTheory.csv")
+
+        for index, row in styles_df.iterrows():
+            file_id = row['musicTheoryTerm'].replace("/", "_")
+            filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, filename)
+            if os.path.isfile(outfile):
+                print(f"Sample {file_id} already generated.Skip")
+            else:
+                print(row['prompt'])
+                predict(row['prompt'], None, None, None, 0.8, 0.6, 30, output_folder, filename)
+                print(f"Generated {filename}")
+
+    elif args.eval_set == 'imemnet':
+        print("Start generating for IMEMNet dataset")
+        images_folder = '/home2/faculty/ktiurina/composer/data/IMEMNet/images_processed'
+
+        output_folder = '/home2/faculty/ktiurina/composer/data/generated/IMEMNet/MuMu-LLaMA'
+        os.makedirs(output_folder, exist_ok=True)
+        jpg_files = [f for f in os.listdir(images_folder) if f.lower().endswith('.jpg')]
+
+        for input_image in jpg_files:
+            file_id = input_image.split('.')[0]
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+                print(f"Sample {file_id} already generated. Skip")
+            else:
+                image_path = os.path.join(images_folder, input_image)
+                prompt = 'Generate music for the image'
+                predict(prompt, image_path, None, None, 0.8, 0.6, 30, output_folder, output_filename)
+                print(f"Generated {output_filename}")
+    elif args.eval_set == 'muvideo':
+        print("Start generating for MUVideo dataset")
+        muvideo_instructions = '/home2/faculty/ktiurina/composer/data/MUVideo/MUVideoInstructions.json'
+        videos_folder = '/home2/faculty/ktiurina/composer/data/MUVideo/muvideo_videos/hpctmp/e0589920/MUGen/data/MUVideo/audioset_video'
+        with open(muvideo_instructions, 'r') as file:
+            MuVideo = json.load(file)
+
+        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MUVideo/MuMU-LLaMA'
+        os.makedirs(output_folder, exist_ok=True)
+        for sample in MuVideo:
+            file_id = sample['input_file'].split('.')[0]
+            output_filename = f'{file_id}.wav'
+            outfile = os.path.join(output_folder, f'{file_id}.wav')
+            if os.path.isfile(outfile):
+                print(f"Sample {file_id} already generated. Skip")
+            else:
+                print(f"Start generating for {file_id}")
+                video_path = os.path.join(videos_folder, sample['input_file'])
+                human_msg = [msg for msg in sample['conversation'] if msg.get('from') == 'human']
+                if len(human_msg) > 0:
+                    prompt = human_msg[0]['value']
+                else:
+                    prompt = 'Generate music for the video'
+                try:
+                    predict(prompt, None, None, video_path, 0.8, 0.6, 30, output_folder, output_filename)
+                    print(f"Generated {output_filename}")
+                except Exception as e:
+                    print("ERROR: ", e)
+                    logging.exception("Error while generating music for MUVideo")
