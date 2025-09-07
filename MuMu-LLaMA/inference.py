@@ -92,6 +92,15 @@ def parse_args():
         "--output_folder", default=None, type=str,
         help="Output folder"
     )
+    parser.add_argument(
+        "--instructions", default=None, type=str,
+        help="Instructions file of folder"
+    )
+    parser.add_argument(
+        "--input_folder", default=None, type=str,
+        help="Folder with input files"
+    )
+    
 
     return parser.parse_args()
 
@@ -300,15 +309,15 @@ if __name__ == "__main__":
         print(args.image_file)
         print(args.audio_file)
         print(args.video_file)
-        output_folder = '/home2/faculty/ktiurina/composer/data/survey'
+        output_folder = args.output_folder
         output_filename = args.filename
         if (output_filename is None):
             output_filename = next(tempfile._get_candidate_names()) + '.wav'
         predict(args.prompt, args.image_file, args.audio_file, args.video_file, 0.8, 0.6, 30, output_folder, output_filename)
     elif args.eval_set == 'musiccaps':
         print("Start generating for MusicCaps dataset")
-        musiccaps = load_from_disk('/home2/faculty/ktiurina/composer/data/MusicCaps/metadata')
-        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MusicCaps/MuMu-LLaMA'
+        musiccaps = load_from_disk(args.instructions)
+        output_folder = args.output_folder
         os.makedirs(output_folder, exist_ok=True)
         for sample in musiccaps:
             file_id = sample['ytid']
@@ -322,12 +331,12 @@ if __name__ == "__main__":
             print(f"Generated {output_filename}")
     elif args.eval_set == 'muimage':
         print("Start generating for MUImage dataset")
-        muimage_instructions = '/home2/faculty/ktiurina/composer/data/MUImage/MUImageInstructions.json'
-        images_folder = '/home2/faculty/ktiurina/composer/data/MUImage/muimage_images/hpctmp/e0589920/MUGen/data/MUImage/audioset_images'
+        muimage_instructions = args.instructions
+        images_folder = args.input_folder
         with open(muimage_instructions, 'r') as file:
             MuImage = json.load(file)
 
-        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MUImage/MuMu-LLaMA'
+        output_folder = args.output_folder
         os.makedirs(output_folder, exist_ok=True)
         for sample in MuImage:
             file_id = sample['input_file'].split('.')[0]
@@ -348,7 +357,7 @@ if __name__ == "__main__":
         print("Start generating for custom dataset")
         output_folder = args.output_folder
         os.makedirs(output_folder, exist_ok=True)
-        styles_df = pd.read_csv("/home2/faculty/ktiurina/composer/data/custom/MusicTheory.csv")
+        styles_df = pd.read_csv(args.instructions)
 
         for index, row in styles_df.iterrows():
             file_id = row['musicTheoryTerm'].replace("/", "_")
@@ -363,9 +372,9 @@ if __name__ == "__main__":
 
     elif args.eval_set == 'imemnet':
         print("Start generating for IMEMNet dataset")
-        images_folder = '/home2/faculty/ktiurina/composer/data/IMEMNet/images_processed'
+        images_folder = args.input_folder
 
-        output_folder = '/home2/faculty/ktiurina/composer/data/generated/IMEMNet/MuMu-LLaMA'
+        output_folder = args.output_folder
         os.makedirs(output_folder, exist_ok=True)
         jpg_files = [f for f in os.listdir(images_folder) if f.lower().endswith('.jpg')]
 
@@ -382,12 +391,12 @@ if __name__ == "__main__":
                 print(f"Generated {output_filename}")
     elif args.eval_set == 'muvideo':
         print("Start generating for MUVideo dataset")
-        muvideo_instructions = '/home2/faculty/ktiurina/composer/data/MUVideo/MUVideoInstructions.json'
-        videos_folder = '/home2/faculty/ktiurina/composer/data/MUVideo/muvideo_videos/hpctmp/e0589920/MUGen/data/MUVideo/audioset_video'
+        muvideo_instructions = args.instructions
+        videos_folder = args.input_folder
         with open(muvideo_instructions, 'r') as file:
             MuVideo = json.load(file)
 
-        output_folder = '/home2/faculty/ktiurina/composer/data/generated/MUVideo/MuMU-LLaMA'
+        output_folder = args.output_folder
         os.makedirs(output_folder, exist_ok=True)
         for sample in MuVideo:
             file_id = sample['input_file'].split('.')[0]
